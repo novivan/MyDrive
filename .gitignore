@@ -1,0 +1,16 @@
+.idea
+*.iml
+*.jar
+
+*.class*
+*.classpath
+*.project
+*.settings
+
+client/.gradle
+client/build
+server/.gradle
+server/build
+
+*gradle-wrapper.properties
+*gradlew*
