@@ -45,19 +45,19 @@ public class AppState {
         return lastUserId.get();
     }
 
-    public void setLastUserId(int id) {
+    public synchronized void setLastUserId(int id) {
         lastUserId.set(id);
         properties.setProperty(LAST_USER_ID, String.valueOf(lastUserId.get()));
         saveToFile();
     }
 
-    public void incrementLastUserId() {
+    public synchronized void incrementLastUserId() {
         lastUserId.incrementAndGet();
         properties.setProperty(LAST_USER_ID, String.valueOf(lastUserId.get()));
         saveToFile();
     }
 
-    public Integer produceNewUserId() {
+    public synchronized Integer produceNewUserId() {
         incrementLastUserId();
         return lastUserId.get();
     }
