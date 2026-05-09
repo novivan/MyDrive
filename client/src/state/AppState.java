@@ -31,6 +31,7 @@ public class AppState {
             properties.load(fis);
         } catch (Exception e) {
             System.err.println(e.toString());
+            e.printStackTrace();
         }
 
         syncDirPath = new AtomicReference<>(properties.getProperty(SYNC_DIR_PATH));
@@ -54,6 +55,7 @@ public class AppState {
             properties.store(fos, null);
         } catch (Exception e) {
             System.err.println(e.toString());
+            e.printStackTrace();
         }
     }
 

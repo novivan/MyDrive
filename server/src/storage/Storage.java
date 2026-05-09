@@ -1,9 +1,11 @@
 package storage;
 
+import messages.Constants;
+import serializer.Serializer;
+
 import java.io.File;
-import java.util.ArrayList;
+import java.io.FileOutputStream;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class Storage {
@@ -17,8 +19,7 @@ public class Storage {
     }
 
     // тут нужно будет хорошенько расписать про то, как парсить папку storage при старте
-    private Map<Long, UserStorage> usersStorages;
-    private final Long CHUNK_SIZE = 8192L; // пока так, потом мб сделаю для каждого файла свой подсчет
+    private Map<Integer, UserStorage> usersStorages;
 
     private Storage() {
         usersStorages = new HashMap<>();
@@ -27,21 +28,24 @@ public class Storage {
         var usersDirs = storageDir.listFiles();
         for (int i = 0; i < usersDirs.length; i++) {
             File userDir = usersDirs[i];
-
-            Long userId = Long.parseLong(userDir.getName());
+            
+            // на случай, если редактор добавляет рандомные файлы
+            Integer userId = null;
+            try {
+                userId = Integer.parseInt(userDir.getName());
+            } catch (NumberFormatException e) {
+                continue;
+            }
             UserStorage userStorage = new UserStorage(userId);
 
             var userFiles = userDir.listFiles();
             for (int j = 0; j < userFiles.length; j++) {
                 File file = userFiles[j];
                 Long fileLength = file.length();
-                Long chanksAmount = (fileLength + CHUNK_SIZE - 1) / CHUNK_SIZE;
                 FileInfo fileInfo = new FileInfo(
                         file.getName(),
                         fileLength,
-                        CHUNK_SIZE,
-                        chanksAmount,
-                        getFileChunksHashes(file, chanksAmount)
+                        Serializer.getFileHashses(file)
                 );
                 userStorage.addFile(fileInfo);
             }
@@ -49,14 +53,34 @@ public class Storage {
         }
     }
 
-    // переделать на норм хэши
-    private List<Long> getFileChunksHashes(File file, Long chunksAmount) {
-        new ArrayList<Long>(1);
-        var ret = new ArrayList<Long>(chunksAmount.intValue());
-        for (int i = 0; i < chunksAmount; i++) {
-            ret.add(0L /* TODO: переделать */);
+    public Map<Integer, UserStorage> getUsersStorages() {
+        return usersStorages;
+    }
+
+    public void createFile(Integer userId, String filename, byte[] arr) {
+        String newFilePath = "storage/" + userId.toString() + "/" + filename;
+        try (FileOutputStream fos = new FileOutputStream(newFilePath)) {
+            fos.write(arr);
+            File file = new File(newFilePath);
+            usersStorages.get(userId).addFile(new FileInfo(filename, (long)arr.length, Serializer.getFileHashses(file)));
+        } catch (Exception e) {
+            System.err.println(e.toString());
+            e.printStackTrace();
         }
-        return ret;
+    }
+
+    public void deleteFile(Integer userId, String filename) {
+        usersStorages.get(userId).deleteFile(filename);
+        // реально удаляем
+        File storageDir = new File("storage/" + userId.toString());
+        var usersDirs = storageDir.listFiles();
+        for (int i = 0; i < usersDirs.length; i++) {
+            File userDir = usersDirs[i];
+            if (userDir.getName().equals(filename)) {
+                userDir.delete();
+                break;
+            }
+        }
     }
 
     public String toString() {

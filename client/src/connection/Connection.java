@@ -1,6 +1,9 @@
 package connection;
 
+import messages.FilesMessage;
+import serializer.Serializer;
 import state.AppState;
+import storage.Storage;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -8,9 +11,11 @@ import java.nio.channels.SocketChannel;
 
 public class Connection {
     private static AppState state;
+    private static Storage storage;
 
     private void updateState() {
         state = AppState.getInstance();
+        storage = Storage.getInstance();
     }
 
     public Connection() {
@@ -29,18 +34,11 @@ public class Connection {
 
                 // 2) сообщает свой ID (если id нет, получим от сервера)
                 String message = "id = " + userId;
-                ByteBuffer writeBuffer = ByteBuffer.wrap(message.getBytes());
-                socketChannel.write(writeBuffer);
+                Serializer.writeString(socketChannel, message);
                 System.out.println("Sent id to server");
 
                 if (userId == -1) {
-                    // проблема с тем, что сейчас сериализация через перевод в строку и каждая цифра занимает байт
-                    // а инт можно уместить всего в 4 байта
-                    ByteBuffer readBuffer = ByteBuffer.allocate(1024);
-                    int bytesRead = socketChannel.read(readBuffer);
-                    readBuffer.flip(); // переключение между режимами чтения и записи
-
-                    String response = new String(readBuffer.array(), 0, bytesRead);
+                    String response = Serializer.readString(socketChannel);
                     Integer id = Integer.parseInt(response);
 
                     System.out.printf("Сервер назанчил нам id: %d\n", id);
@@ -49,9 +47,27 @@ public class Connection {
                     System.out.printf("Уже есть id: %d\n", userId);
                 }
 
+                // 3) клиент сообщает серверу список файлов
+                FilesMessage filesMessage = storage.prepareSyncMessage();
+                Serializer.writeMessage(socketChannel, Serializer.serialize(filesMessage));
+                System.out.println("Sent list of files to server");
+
+                // 4) сервер запрашивает файлы по одному, клиент отвечает
+                int requestsCount = Integer.parseInt(Serializer.readString(socketChannel));
+                System.out.printf("Server requested %d file(s)\n", requestsCount);
+                for (int i = 0; i < requestsCount; i++) {
+                    String filename = Serializer.readString(socketChannel);
+                    System.out.printf("\tServer requested file: \"%s\"\n", filename);
+
+                    byte[] fileData = storage.readFileBytes(filename);
+                    Serializer.writeMessage(socketChannel, fileData);
+                    System.out.printf("\tSent file \"%s\" (%d bytes)\n", filename, fileData.length);
+                }
+
                 // socketChannel.close(); происходит автоматически из-за try with resources
             } catch (Exception e) {
                 System.err.println(e.toString());
+                e.printStackTrace();
             }
         }
     }

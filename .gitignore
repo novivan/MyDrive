@@ -8,9 +8,15 @@
 *.settings
 
 client/.gradle
+client/gradle
 client/build
+client/bin
+
 server/.gradle
+server/gradle
 server/build
+server/bin
 
 *gradle-wrapper.properties
 *gradlew*
+.gradle
