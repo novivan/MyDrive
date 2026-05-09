@@ -1,0 +1,68 @@
+ОТЧЕТ ПО HW4
+
+Новиков Иван, 235
+
+ЦЕЛЬ
+Сервис синхронизации файлов клиент↔сервер по TCP (упрощённый
+Yandex Disk): клиент по команде "sync" приводит серверное
+хранилище к состоянию своей локальной папки. Несколько
+пользователей, несколько одновременных клиентов, многопоточная
+загрузка файлов, опциональный DMA-режим.
+
+ОЦЕНКА: до 10 баллов.
+Язык: Java 17. Framework: голый java.nio (SocketChannel /
+ServerSocketChannel), без сторонних сетевых библиотек. Своя
+сериализация: ObjectOutputStream поверх собственного
+length-prefix envelope-протокола.
+
+АРХИТЕКТУРА
+Три модуля Gradle: common (сообщения + Serializer), server,
+client.
+Сервер: ServerSocketChannel + cached thread pool. Storage
+thread-safe (ConcurrentHashMap, CopyOnWriteArrayList, per-user
+ReentrantLock). На каждое входящее соединение читается первый
+envelope: HELLO -> ClientHandler (управляющее), UPLOAD_HELLO ->
+UploadHandler (отдельный сокет под один файл).
+Клиент: REPL (sync / exit). Управляющее соединение делает
+handshake и обмен списками; для загрузки открывает до
+max.server.connections (1..32) параллельных сокетов через
+FixedThreadPool.
+
+ПРОТОКОЛ (envelope = 1 байт type + 4 байта length BE + payload)
+  HELLO(userId)            userId=-1 -> сервер выдаёт новый
+  HELLO_ACK(userId)
+  FILES_LIST(List<FileInfo{name,size,hashes}>)
+  FILES_REQUEST(List<filename>)        что догрузить
+  параллельно по отдельным сокетам:
+    UPLOAD_HELLO(userId, filename, dma)
+    FILE_HEADER(name, size)
+    FILE_CHUNK(bytes)*  + FILE_END     если dma=false
+    либо сырые байты длиной size       если dma=true
+    UPLOAD_ACK
+  обратно:
+  UPLOADS_DONE                         клиент -> сервер
+  SYNC_DONE(SyncResultMessage)         сервер -> клиент
+Diff на сервере: merge отсортированных списков по имени;
+совпадающие сравниваются по size+hashes (CRC32 по 10 KiB).
+Запись атомарная: <file>.part -> Files.move(ATOMIC_MOVE).
+
+КЛЮЧЕВЫЕ ФРАГМЕНТЫ
+Envelope (Serializer.java):
+  void writeEnvelope(ch, type, payload):
+    hdr = ByteBuffer(5): type byte + length int BE
+    writeFully(hdr); writeFully(payload)
+  Envelope readEnvelope(ch): обратное.
+  writeObject(ch,type,obj) = writeEnvelope(ch,type,serialize(obj)).
+Сериализация: ObjectOutputStream over ByteArrayOutputStream;
+records реализуют Serializable.
+Диспатч (server/Main.java):
+  Envelope first = readEnvelope(ch);
+  if HELLO        -> ClientHandler(ch, hello).run();
+  if UPLOAD_HELLO -> UploadHandler(ch, hello).run();
+Параллельная загрузка (client/Connection.java):
+  pool = FixedThreadPool(min(maxConn, files.size()))
+  for f in files: futures += pool.submit(uploadOne(f))
+  for ft: totalBytes += ft.get()
+  writeEnvelope(ctrl, UPLOADS_DONE, []).
+DMA: client fc.transferTo(socket); server fc.transferFrom(socket).
+

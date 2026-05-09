@@ -1,16 +1,16 @@
 # MyDrive
 remote drive for networks HW4
 
-## этапы сборки (для клиента и сервера)
+## этапы сборки и запуска
 1) создать gradle wrapper:
 ```
 gradle wrapper
 ```
-2) собрать проект:
+2) запустить сервер:
 ```
-./gradlew build
+./gradlew :server:run
 ```
-3) запустить проект:
+3) запустить клиент (в другом терминале):
 ```
-./gradlew run
+./gradlew :client:run
 ```
