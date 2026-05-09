@@ -6,9 +6,6 @@ import serializer.Serializer;
 import state.AppState;
 
 import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -18,18 +15,12 @@ public class Storage {
 
     private final String path;
     private final File syncDir;
-    private final List<File> files;
-
 
     private Storage(String syncDirPath) {
         path = syncDirPath;
         syncDir = new File(path);
-        files = new ArrayList<>();
-
-        for (File file: Objects.requireNonNull(syncDir.listFiles())) {
-            if (file.isFile()) {
-                files.add(file);
-            }
+        if (!syncDir.exists() && !syncDir.mkdirs()) {
+            System.err.println("Failed to create sync dir: " + syncDir.getAbsolutePath());
         }
     }
 
@@ -40,7 +31,21 @@ public class Storage {
         return instance;
     }
 
+    public String getPath() {
+        return path;
+    }
+
+
     public FilesMessage prepareSyncMessage() {
+        List<File> files = new ArrayList<>();
+        File[] listed = syncDir.listFiles();
+        if (listed != null) {
+            for (File file : listed) {
+                if (file.isFile()) {
+                    files.add(file);
+                }
+            }
+        }
         return new FilesMessage(
                 files.stream()
                         .map(fl -> new FileInfo(
@@ -49,9 +54,5 @@ public class Storage {
                                 Serializer.getFileHashses(fl)
                         )).toList()
         );
-    }
-
-    public byte[] readFileBytes(String filename) throws IOException {
-        return Files.readAllBytes(Path.of(path, filename));
     }
 }

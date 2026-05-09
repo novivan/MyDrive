@@ -1,18 +1,19 @@
 package storage;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class UserStorage {
     private final Integer userId; // по этому же id будем называть папку пользователя
-    private List<FileInfo> files; //тут вот хз список или мапу сделать, вопрос в сопоставлении с реальной папкой будет. Мб можно по имени файла посортить
+    private final List<FileInfo> files;
 
     public UserStorage(Integer userId) {
         this.userId = userId;
-        this.files = new ArrayList<>();
+        this.files = new CopyOnWriteArrayList<>();
     }
 
     public void addFile(FileInfo fileInfo) {
+        this.files.removeIf(fi -> fi.name().equals(fileInfo.name()));
         this.files.add(fileInfo);
     }
 

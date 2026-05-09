@@ -17,12 +17,14 @@ public class AppState {
     private final String SERVER_ADDR = "server.addr";
     private final String SERVER_PORT = "server.port";
     private final String MAX_SERVER_CONNECTIONS = "max.server.connections";
+    private final String DMA_ENABLED = "dma.enabled";
     private final String USER_ID = "user.id";
 
     private final AtomicReference<String> syncDirPath;
     private final AtomicReference<String> serverAddr;
     private final AtomicInteger serverPort;
     private final AtomicInteger maxServerConnections;
+    private final boolean dmaEnabled;
     private final AtomicInteger userId;
 
     private AppState() {
@@ -37,9 +39,17 @@ public class AppState {
         syncDirPath = new AtomicReference<>(properties.getProperty(SYNC_DIR_PATH));
         serverAddr = new AtomicReference<>(properties.getProperty(SERVER_ADDR));
         serverPort = new AtomicInteger(Integer.parseInt(properties.getProperty(SERVER_PORT)));
-        maxServerConnections = new AtomicInteger(Integer.parseInt(properties.getProperty(MAX_SERVER_CONNECTIONS)));
-        // TODO: при первом запуске userId хочу оставить пустым, отправить запрос серваку, взять первый свободный id
-        // пока что просто заглушка, ну или кстати можно будет подняться на уровеь выше и понять, что -1 нехорошо
+
+        int rawMax = Integer.parseInt(properties.getProperty(MAX_SERVER_CONNECTIONS, "1"));
+        int clampedMax = Math.max(1, Math.min(32, rawMax));
+        if (clampedMax != rawMax) {
+            System.err.printf("Warning: %s=%d is out of range [1..32], clamped to %d%n",
+                    MAX_SERVER_CONNECTIONS, rawMax, clampedMax);
+        }
+        maxServerConnections = new AtomicInteger(clampedMax);
+
+        dmaEnabled = Boolean.parseBoolean(properties.getProperty(DMA_ENABLED, "false"));
+
         userId = new AtomicInteger(Integer.parseInt(Optional.ofNullable(properties.getProperty(USER_ID)).orElse("-1")));
     }
 
@@ -73,6 +83,10 @@ public class AppState {
 
     public int getMaxServerConnections() {
         return maxServerConnections.get();
+    }
+
+    public boolean isDmaEnabled() {
+        return dmaEnabled;
     }
 
     public int getUserId() {

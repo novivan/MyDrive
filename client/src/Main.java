@@ -1,6 +1,9 @@
-import state.AppState;
-import java.lang.StringBuilder;
 import connection.Connection;
+import state.AppState;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.lang.StringBuilder;
 
 public class Main {
     public static void main(String[] args) {
@@ -20,5 +23,27 @@ public class Main {
 
         Connection connection = new Connection();
         connection.connect();
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
+            System.out.println("Commands: sync | exit");
+            String line;
+            while (true) {
+                System.out.print("> ");
+                System.out.flush();
+                line = reader.readLine();
+                if (line == null) break;
+                line = line.trim();
+                if (line.isEmpty()) continue;
+                if (line.equals("exit") || line.equals("quit")) {
+                    break;
+                } else if (line.equals("sync")) {
+                    connection.connect();
+                } else {
+                    System.out.println("Unknown command: " + line + " (use 'sync' or 'exit' or 'quit'')");
+                }
+            }
+        } catch (Exception e) {
+            System.err.println(e.toString());
+        }
     }
 }
